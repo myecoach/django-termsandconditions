@@ -25,6 +25,7 @@ class TermsAndConditionsRedirectMiddleware(MiddlewareMixin):
     """
 
     def process_request(self, request):
+
         """Process each request to app to ensure terms have been accepted"""
 
         LOGGER.debug('termsandconditions.middleware')
@@ -37,6 +38,9 @@ class TermsAndConditionsRedirectMiddleware(MiddlewareMixin):
             user_authenticated = request.user.is_authenticated
 
         if user_authenticated and is_path_protected(current_path):
+            # get_active_terms_not_agreed_to has an optional type argument that defaults to SITEWIDE
+            #   which is an attribute of the TermsAndConditions model. This is why this method doesn't pick up
+            #   TermsAndConditions that aren't of type sitewide e.g. data-export ts and cs
             for term in TermsAndConditions.get_active_terms_not_agreed_to(request.user):
                 return redirect_to_terms_accept(current_path, term.slug)
 
