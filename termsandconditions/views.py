@@ -26,20 +26,17 @@ class GetTermsViewMixin(object):
 
     def get_terms(self, kwargs):
         """Checks URL parameters for slug and/or version to pull the right TermsAndConditions object"""
+
         slug = kwargs.get("slug")
         version = kwargs.get("version")
-        type = kwargs.get("type")
 
         if slug and version:
             terms = [TermsAndConditions.objects.filter(slug=slug, version_number=version).latest('date_active')]
         elif slug:
             terms = [TermsAndConditions.get_active(slug)]
         else:
-            if type:
-                # Return a list of not agreed to terms for the current user for the list view
-                terms = TermsAndConditions.get_active_terms_not_agreed_to(self.request.user, type)
-            else:
-                terms = TermsAndConditions.get_active_terms_not_agreed_to(self.request.user)
+            # Return a list of not agreed to terms for the current user for the list view
+            terms = TermsAndConditions.get_active_terms_not_agreed_to(self.request.user)
         return terms
 
 
@@ -84,10 +81,6 @@ class AcceptTermsView(CreateView, GetTermsViewMixin):
     def get_initial(self):
         """Override of CreateView method, queries for which T&C to accept and catches returnTo from URL"""
         LOGGER.debug('termsandconditions.views.AcceptTermsView.get_initial')
-
-        type = self.request.GET.get('type', None)
-        if type:
-            self.kwargs['type']=type
 
         terms = self.get_terms(self.kwargs)
         return_to = self.request.GET.get('returnTo', '/')

@@ -39,18 +39,10 @@ class UserTermsAndConditions(models.Model):
 class TermsAndConditions(models.Model):
     """Holds Versions of TermsAndConditions
     Active one for a given slug is: date_active is not Null and is latest not in future"""
-    SITEWIDE = 0
-    DATA_EXPORT = 10
-    TERMS_AND_CONDITIONS_TYPES = (
-        (SITEWIDE, 'Sitewide Ts and Cs'),
-        (DATA_EXPORT, 'Data Export Pages'),
-    )
-
     slug = models.SlugField(default=DEFAULT_TERMS_SLUG)
     name = models.TextField(max_length=255)
     users = models.ManyToManyField(settings.AUTH_USER_MODEL, through=UserTermsAndConditions, blank=True)
     version_number = models.DecimalField(default=1.0, decimal_places=2, max_digits=6)
-    type = models.PositiveIntegerField(choices=TERMS_AND_CONDITIONS_TYPES, default=SITEWIDE)
     text = models.TextField(null=True, blank=True)
     info = models.TextField(
         null=True, blank=True, help_text=_("Provide users with some info about what's changed and why")
@@ -93,38 +85,38 @@ class TermsAndConditions(models.Model):
     @staticmethod
     def get_active_terms_ids():
         """Returns a list of the IDs of of all terms and conditions"""
-        # Todo: re-implement caching once this is sorted
-        # active_terms_ids = cache.get('tandc.active_terms_ids')
-        # if active_terms_ids is None:
-        active_terms_dict = {}
-        active_terms_ids = []
 
-        active_terms_set = TermsAndConditions.objects.filter(date_active__isnull=False, date_active__lte=timezone.now()).order_by('date_active')
-        for active_terms in active_terms_set:
-            active_terms_dict[active_terms.slug] = active_terms.id
+        active_terms_ids = cache.get('tandc.active_terms_ids')
+        if active_terms_ids is None:
+            active_terms_dict = {}
+            active_terms_ids = []
 
-        active_terms_dict = OrderedDict(sorted(active_terms_dict.items(), key=lambda t: t[0]))
+            active_terms_set = TermsAndConditions.objects.filter(date_active__isnull=False, date_active__lte=timezone.now()).order_by('date_active')
+            for active_terms in active_terms_set:
+                active_terms_dict[active_terms.slug] = active_terms.id
 
-        for terms in active_terms_dict:
-            active_terms_ids.append(active_terms_dict[terms])
+            active_terms_dict = OrderedDict(sorted(active_terms_dict.items(), key=lambda t: t[0]))
 
-        # cache.set('tandc.active_terms_ids', active_terms_ids, TERMS_CACHE_SECONDS)
+            for terms in active_terms_dict:
+                active_terms_ids.append(active_terms_dict[terms])
+
+            cache.set('tandc.active_terms_ids', active_terms_ids, TERMS_CACHE_SECONDS)
 
         return active_terms_ids
 
     @staticmethod
     def get_active_terms_list():
         """Returns all the latest active terms and conditions"""
-        # Todo: re-implement caching once this is sorted
-        # active_terms_list = cache.get('tandc.active_terms_list')
-        # if active_terms_list is None:
-        active_terms_list = TermsAndConditions.objects.filter(id__in=TermsAndConditions.get_active_terms_ids()).order_by('slug')
-        # cache.set('tandc.active_terms_list', active_terms_list, TERMS_CACHE_SECONDS)
+
+        active_terms_list = cache.get('tandc.active_terms_list')
+        if active_terms_list is None:
+            active_terms_list = TermsAndConditions.objects.filter(id__in=TermsAndConditions.get_active_terms_ids()).order_by('slug')
+            cache.set('tandc.active_terms_list', active_terms_list, TERMS_CACHE_SECONDS)
 
         return active_terms_list
 
     @staticmethod
-    def get_active_terms_not_agreed_to(user, type=SITEWIDE):
+    def get_active_terms_not_agreed_to(user):
         """Checks to see if a specified user has agreed to all the latest terms and conditions"""
 
         if TERMS_EXCLUDE_USERS_WITH_PERM is not None:
@@ -132,17 +124,17 @@ class TermsAndConditions(models.Model):
                 # Django's has_perm() returns True if is_superuser, we don't want that
                 return []
 
-        # Todo: re-implement caching once this is sorted
-        # not_agreed_terms = cache.get('tandc.not_agreed_terms_' + user.get_username())
-        # if not_agreed_terms is None:
-        try:
-            LOGGER.debug("Not Agreed Terms")
-            not_agreed_terms = TermsAndConditions.get_active_terms_list().filter(type=type).exclude(
-                userterms__in=UserTermsAndConditions.objects.filter(user=user)
-            ).order_by('slug')
+        not_agreed_terms = cache.get('tandc.not_agreed_terms_' + user.get_username())
+        if not_agreed_terms is None:
+            try:
+                LOGGER.debug("Not Agreed Terms")
+                not_agreed_terms = TermsAndConditions.get_active_terms_list().exclude(
+                    userterms__in=UserTermsAndConditions.objects.filter(user=user)
+                ).order_by('slug')
 
-            # cache.set('tandc.not_agreed_terms_' + user.get_username(), not_agreed_terms, TERMS_CACHE_SECONDS)
-        except (TypeError, UserTermsAndConditions.DoesNotExist):
-            return []
+                cache.set('tandc.not_agreed_terms_' + user.get_username(), not_agreed_terms, TERMS_CACHE_SECONDS)
+            except (TypeError, UserTermsAndConditions.DoesNotExist):
+                return []
+
         return not_agreed_terms
 
