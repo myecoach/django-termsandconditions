@@ -36,7 +36,7 @@ class TermsAndConditionsRedirectMiddleware(MiddlewareMixin):
         else:
             user_authenticated = request.user.is_authenticated
 
-        if user_authenticated and is_path_protected(current_path):
+        if user_authenticated and is_path_protected(current_path) and request.user.is_admin_type():
             for term in TermsAndConditions.get_active_terms_not_agreed_to(request.user):
                 return redirect_to_terms_accept(current_path, term.slug)
 
