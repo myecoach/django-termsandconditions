@@ -34,7 +34,7 @@ class TermsAndConditionsRedirectMiddleware(MiddlewareMixin):
 
         current_path = request.META["PATH_INFO"]
 
-        if request.user.is_authenticated and is_path_protected(current_path):
+        if request.user.is_authenticated and is_path_protected(current_path) and request.user.is_admin_type():
             for term in TermsAndConditions.get_active_terms_not_agreed_to(request.user):
                 # Check for querystring and include it if there is one
                 qs = request.META["QUERY_STRING"]
